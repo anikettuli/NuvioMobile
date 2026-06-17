@@ -33,3 +33,4 @@ rootProject.name = "Nuvio"
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
 include(":composeApp")
+include(":androidApp")

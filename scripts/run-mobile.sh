@@ -145,10 +145,10 @@ android_apk_path() {
 
   case "$flavor" in
     full)
-      echo "$ROOT_DIR/composeApp/build/outputs/apk/full/debug/composeApp-full-debug.apk"
+      echo "$ROOT_DIR/androidApp/build/outputs/apk/full/debug/androidApp-full-debug.apk"
       ;;
     playstore)
-      echo "$ROOT_DIR/composeApp/build/outputs/apk/playstore/debug/composeApp-playstore-debug.apk"
+      echo "$ROOT_DIR/androidApp/build/outputs/apk/playstore/debug/androidApp-playstore-debug.apk"
       ;;
   esac
 }
@@ -162,7 +162,7 @@ build_android_apk() {
   apk_path="$(android_apk_path "$flavor")"
 
   echo "Building Android $flavor debug APK..." >&2
-  "$GRADLEW" ":composeApp:assemble${flavor_task_part}Debug" >&2
+  "$GRADLEW" ":androidApp:assemble${flavor_task_part}Debug" >&2
 
   if [[ ! -f "$apk_path" ]]; then
     echo "Expected APK not found at: $apk_path" >&2

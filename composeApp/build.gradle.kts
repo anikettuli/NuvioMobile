@@ -150,7 +150,7 @@ fun readXcconfigValue(file: File, key: String): String? {
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
-    alias(libs.plugins.androidApplication)
+    alias(libs.plugins.androidKotlinMultiplatformLibrary)
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
     alias(libs.plugins.kotlinxSerialization)
@@ -187,6 +187,19 @@ val iosDistributionSourceDir = if (iosDistribution == "full") {
 }
 val iosFrameworkBundleId = "com.nuvio.media"
 val fullCommonSourceDir = project.file("src/fullCommonMain/kotlin")
+val androidDistribution = (
+    providers.gradleProperty("nuvio.android.distribution").orNull
+        ?: System.getenv("NUVIO_ANDROID_DISTRIBUTION")
+        ?: if (gradle.startParameter.taskNames.any { it.lowercase().contains("playstore") }) "playstore" else "full"
+    ).trim().lowercase()
+require(androidDistribution == "full" || androidDistribution == "playstore") {
+    "nuvio.android.distribution must be 'full' or 'playstore'."
+}
+val androidDistributionSourceDir = if (androidDistribution == "full") {
+    "src/androidFull/kotlin"
+} else {
+    "src/androidPlaystore/kotlin"
+}
 val generatedRuntimeConfigDir = layout.buildDirectory.dir("generated/runtime-config/kotlin")
 val requestedGradleTasks = gradle.startParameter.taskNames.map { taskName ->
     taskName.substringAfterLast(':').lowercase()
@@ -214,9 +227,17 @@ tasks.withType<KotlinCompilationTask<*>>().configureEach {
 kotlin {
     jvmToolchain(25)
 
-    androidTarget {
+    androidLibrary {
+        namespace = "com.nuvio.app"
+        compileSdk = libs.versions.android.compileSdk.get().toInt()
+        minSdk = libs.versions.android.minSdk.get().toInt()
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_11)
+        }
+        androidResources {
+            enable = true
+        }
+        withHostTestBuilder {
         }
     }
     
@@ -258,30 +279,40 @@ kotlin {
         val commonMain by getting {
             kotlin.srcDir(generatedRuntimeConfigDir)
         }
-        androidMain.dependencies {
-            implementation(libs.compose.uiToolingPreview)
-            implementation(libs.androidx.appcompat)
-            implementation(libs.androidx.activity.compose)
-            implementation(libs.androidx.core.splashscreen)
-            implementation(libs.androidx.work.runtime)
-            implementation(libs.coil.gif)
-            implementation("androidx.recyclerview:recyclerview:1.4.0")
-            implementation("com.squareup.okhttp3:okhttp:5.4.0")
-            implementation("com.google.code.gson:gson:2.14.0")
-            implementation("io.github.peerless2012:ass-media:0.4.0")
-            implementation(libs.ktor.client.android)
-            implementation(libs.androidx.media3.exoplayer.hls)
-            implementation(libs.androidx.media3.exoplayer.dash)
-            implementation(libs.androidx.media3.exoplayer.smoothstreaming)
-            implementation(libs.androidx.media3.exoplayer.rtsp)
-            implementation(libs.androidx.media3.datasource)
-            implementation(libs.androidx.media3.datasource.okhttp)
-            implementation(libs.androidx.media3.decoder)
-            implementation(libs.androidx.media3.session)
-            implementation(libs.androidx.media3.common)
-            implementation(libs.androidx.media3.container)
-            implementation(libs.androidx.media3.extractor)
-            implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("lib-*.aar"))))
+        androidMain {
+            kotlin.srcDir(androidDistributionSourceDir)
+            if (androidDistribution == "full") {
+                kotlin.srcDir(fullCommonSourceDir)
+            }
+            dependencies {
+                implementation(libs.compose.uiToolingPreview)
+                implementation(libs.androidx.appcompat)
+                implementation(libs.androidx.activity.compose)
+                implementation(libs.androidx.core.splashscreen)
+                implementation(libs.androidx.work.runtime)
+                implementation(libs.coil.gif)
+                implementation("androidx.recyclerview:recyclerview:1.4.0")
+                implementation("com.squareup.okhttp3:okhttp:5.4.0")
+                implementation("com.google.code.gson:gson:2.14.0")
+                implementation("io.github.peerless2012:ass-media:0.4.0")
+                implementation(libs.ktor.client.android)
+                implementation(libs.androidx.media3.exoplayer.hls)
+                implementation(libs.androidx.media3.exoplayer.dash)
+                implementation(libs.androidx.media3.exoplayer.smoothstreaming)
+                implementation(libs.androidx.media3.exoplayer.rtsp)
+                implementation(libs.androidx.media3.datasource)
+                implementation(libs.androidx.media3.datasource.okhttp)
+                implementation(libs.androidx.media3.decoder)
+                implementation(libs.androidx.media3.session)
+                implementation(libs.androidx.media3.common)
+                implementation(libs.androidx.media3.container)
+                implementation(libs.androidx.media3.extractor)
+                implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("lib-*.aar"))))
+                if (androidDistribution == "full") {
+                    implementation(files("libs/quickjs-kt-android-1.0.5-nuvio.aar"))
+                    implementation(libs.ksoup)
+                }
+            }
         }
         commonMain.dependencies {
             implementation(libs.coil.compose)
@@ -311,20 +342,8 @@ kotlin {
     }
 }
 
-afterEvaluate {
-    dependencies {
-        add("fullImplementation", files("libs/quickjs-kt-android-1.0.5-nuvio.aar"))
-        add("fullImplementation", libs.ksoup)
-    }
-}
-
 configurations.matching { it.name == "iosMainImplementation" }.configureEach {
     project.dependencies.add(name, libs.ktor.client.darwin)
-}
-
-dependencies {
-    coreLibraryDesugaring(libs.desugar.jdk.libs)
-    debugImplementation(libs.compose.uiTooling)
 }
 
 configurations.all {
@@ -332,73 +351,3 @@ configurations.all {
     exclude(group = "androidx.media3", module = "media3-ui")
 }
 
-android {
-    namespace = "com.nuvio.app"
-    compileSdk = libs.versions.android.compileSdk.get().toInt()
-
-    signingConfigs {
-        create("release") {
-            if (releaseKeystore != null && releaseStorePassword != null && releaseKeyAlias != null && releaseKeyPassword != null) {
-                storeFile = releaseKeystore
-                storePassword = releaseStorePassword
-                keyAlias = releaseKeyAlias
-                keyPassword = releaseKeyPassword
-            }
-        }
-    }
-
-    defaultConfig {
-        applicationId = "com.nuvio.app"
-        minSdk = libs.versions.android.minSdk.get().toInt()
-        targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionCode = releaseAppVersionCode
-        versionName = releaseAppVersionName
-    }
-    flavorDimensions += "distribution"
-    productFlavors {
-        create("full") {
-            dimension = "distribution"
-        }
-        create("playstore") {
-            dimension = "distribution"
-        }
-    }
-    sourceSets.getByName("full") {
-        manifest.srcFile("src/androidFull/AndroidManifest.xml")
-        java.srcDir(fullCommonSourceDir)
-    }
-    packaging {
-        resources {
-            excludes += "/META-INF/{AL2.0,LGPL2.1}"
-        }
-        jniLibs {
-            useLegacyPackaging = true
-            pickFirsts += listOf(
-                "lib/*/libc++_shared.so",
-                "lib/*/libavcodec.so",
-                "lib/*/libavutil.so",
-                "lib/*/libswscale.so",
-                "lib/*/libswresample.so"
-            )
-        }
-    }
-    buildTypes {
-        getByName("release") {
-            isMinifyEnabled = true
-            isShrinkResources = true
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro",
-            )
-            signingConfig = signingConfigs.getByName("release")
-            ndk {
-                debugSymbolLevel = "FULL"
-            }
-        }
-    }
-    compileOptions {
-        isCoreLibraryDesugaringEnabled = true
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
-    }
-}
