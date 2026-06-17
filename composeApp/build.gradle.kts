@@ -212,6 +212,8 @@ tasks.withType<KotlinCompilationTask<*>>().configureEach {
 }
 
 kotlin {
+    jvmToolchain(25)
+
     androidTarget {
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_11)
