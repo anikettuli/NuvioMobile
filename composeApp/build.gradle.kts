@@ -268,7 +268,7 @@ kotlin {
             implementation("androidx.recyclerview:recyclerview:1.4.0")
             implementation("com.squareup.okhttp3:okhttp:5.4.0")
             implementation("com.google.code.gson:gson:2.14.0")
-            implementation("io.github.peerless2012:ass-media:0.4.0-beta01")
+            implementation("io.github.peerless2012:ass-media:0.4.0")
             implementation(libs.ktor.client.android)
             implementation(libs.androidx.media3.exoplayer.hls)
             implementation(libs.androidx.media3.exoplayer.dash)
